@@ -1,0 +1,37 @@
+# Deprecated alias of `config/rgbd_split.yaml` (kept for backward compatibility).
+# Production preset catalog for split deployment.
+# Use with launch arg `preset:=high_fps` or `preset:=low_cpu`.
+presets:
+  high_fps:
+    rgbd_frontend_node:
+      qos_keep_last: 20
+      sync_max_dt_ms: 8
+      sync_queue_size: 60
+    orbslam3_core_node:
+      pending_queue_size: 20
+      latest_keep_last: 6
+      latest_take: 2
+      worker_time_budget_us: 12000
+      pointcloud_max_points: 8000
+    tracking_cloud_node:
+      publish_hz: 20
+      max_points: 8000
+    path_node:
+      path_max_length: 4000
+
+  low_cpu:
+    rgbd_frontend_node:
+      qos_keep_last: 8
+      sync_max_dt_ms: 15
+      sync_queue_size: 20
+    orbslam3_core_node:
+      pending_queue_size: 8
+      latest_keep_last: 2
+      latest_take: 1
+      worker_time_budget_us: 6000
+      pointcloud_max_points: 3000
+    tracking_cloud_node:
+      publish_hz: 8
+      max_points: 3000
+    path_node:
+      path_max_length: 1200

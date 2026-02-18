@@ -1,0 +1,52 @@
+rgbd_frontend_node:
+  ros__parameters:
+    rgb_topic: /camera/color/image_raw
+    depth_topic: /camera/aligned_depth_to_color/image_raw
+    observation_topic: /orbslam3/observations
+    depth_scale: 0.001
+    depth_max_m: 0.0
+    depth_encoding_override: ""
+    rgb_clone: false
+    depth_clone: false
+    qos_keep_last: 10
+    sync_max_dt_ms: 10
+    sync_queue_size: 30
+    sync_enable_span_guard: true
+    sync_max_span_ms: 500
+    sync_enable_huge_jump_reset: true
+    sync_huge_jump_ms: 2000
+    sync_reset_on_time_backwards: true
+
+orbslam3_core_node:
+  ros__parameters:
+    observation_topic: /orbslam3/observations
+    qos_keep_last: 10
+    pending_queue_size: 10
+    worker_time_budget_ms: 8
+    worker_idle_sleep_us: 0
+    backlog_drop_keep_last: 4
+    map_frame: "map"
+    camera_frame: ""
+    publish_odom: false
+    publish_tf: true
+    lost_auto_reset_enable: false
+    lost_auto_reset_frames: 30
+    pointcloud_max_points: 5000
+    voc_file: ""
+    settings_file: ""
+    use_viewer: false
+    autostart_lifecycle: true
+    sync_stats_period_ms: 1000
+
+path_node:
+  ros__parameters:
+    pose_topic: /orbslam3/camera_pose
+    path_topic: /orbslam3/path
+    path_max_length: 2000
+
+tracking_cloud_node:
+  ros__parameters:
+    tracked_points_service: /orbslam3/get_tracked_points
+    cloud_topic: /orbslam3/tracking/points
+    publish_hz: 15
+    max_points: 5000
