@@ -2,6 +2,8 @@
 
 ROS 2 wrapper for ORB-SLAM3 with reproducible local gates and bag-based validation.
 
+Search keywords: ros2 humble orb-slam3 slam conan
+
 ## What You Get
 
 - Lifecycle SLAM core (`orbslam3_core_node`) and RGB-D frontend (`rgbd_frontend_node`).
