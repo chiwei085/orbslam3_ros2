@@ -1,0 +1,10 @@
+std_msgs/Header header
+uint8 MODE_RGBD=1
+uint8 MODE_STEREO=2
+uint8 MODE_MONO_IMU=3
+uint8 mode
+sensor_msgs/Image[] images
+sensor_msgs/Imu[] imus
+string camera_frame
+uint64 t_track_ns
+int64 dt_ns

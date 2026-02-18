@@ -1,0 +1,4 @@
+bool localization_mode
+---
+bool success
+string message

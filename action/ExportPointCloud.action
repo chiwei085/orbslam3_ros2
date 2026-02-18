@@ -1,0 +1,13 @@
+# Scope: "tracking" (supported), "map" (not supported with current public API)
+string scope
+uint32 max_points
+string output_path
+bool publish_snapshot
+bool include_cloud_in_result
+---
+bool success
+string message
+string output_path
+sensor_msgs/PointCloud2 cloud
+---
+float32 progress

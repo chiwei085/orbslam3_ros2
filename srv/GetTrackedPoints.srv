@@ -1,0 +1,5 @@
+int32 max_points
+---
+bool success
+string message
+sensor_msgs/PointCloud2 cloud
