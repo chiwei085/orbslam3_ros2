@@ -19,6 +19,11 @@ def main() -> None:
         choices=["Debug", "Release", "RelWithDebInfo"],
     )
     ap.add_argument("--clean", action="store_true")
+    ap.add_argument(
+        "--edge",
+        action="store_true",
+        help="enable edge-device build profile (default: off)",
+    )
     args = ap.parse_args()
 
     ws = args.ws.resolve()
@@ -31,17 +36,28 @@ def main() -> None:
             if path.exists():
                 sh(["rm", "-rf", str(path)])
 
-    sh(
-        [
-            "colcon",
-            "build",
-            "--packages-select",
-            args.pkg,
-            "--cmake-args",
-            f"-DCMAKE_BUILD_TYPE={args.build_type}",
-        ],
-        cwd=ws,
-    )
+    cmd = ["colcon", "build", "--packages-select", args.pkg]
+    cmake_args = [f"-DCMAKE_BUILD_TYPE={args.build_type}"]
+    if args.edge:
+        cmd.extend(["--parallel-workers", "1"])
+        cmd.extend(
+            [
+                "--executor",
+                "sequential",
+                "--event-handlers",
+                "console_direct+",
+            ]
+        )
+        cmake_args.extend(
+            [
+                "-DBUILD_TESTING=OFF",
+                "-DCMAKE_CXX_FLAGS_RELEASE=-O2 -g0",
+                "-DCMAKE_C_FLAGS_RELEASE=-O2 -g0",
+            ]
+        )
+    cmd.extend(["--cmake-args", *cmake_args])
+
+    sh(cmd, cwd=ws)
 
 
 if __name__ == "__main__":
