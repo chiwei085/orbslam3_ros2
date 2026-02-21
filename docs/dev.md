@@ -45,6 +45,63 @@ colcon build --packages-select orbslam3_ros2 \
 
 On arm64/aarch64, replace both profiles above with `src/orbslam3_ros2/conan/profiles/linux_armv8`.
 
+## Build Via Script
+
+`scripts/build_colcon.py` wraps `colcon build` for this package.
+
+Recommended mode (Ninja + Conan toolchain):
+
+```bash
+source /opt/ros/humble/setup.bash
+python3 src/orbslam3_ros2/scripts/build_colcon.py \
+  --ws "$COLCON_WS" \
+  --pkg orbslam3_ros2 \
+  --ninja-conan
+```
+
+What `--ninja-conan` does:
+
+- Runs `conan install` into `build/conan` (unless `--skip-conan` is set).
+- Auto-picks profile by arch (`linux_x86_64` or `linux_armv8`) unless `--profile` is provided.
+- Builds with `-G Ninja`, `-DCMAKE_TOOLCHAIN_FILE=.../build/conan/conan_toolchain.cmake`, and `-DCMAKE_PREFIX_PATH=.../build/conan`.
+- Sets conservative build parallelism by default (`CMAKE_BUILD_PARALLEL_LEVEL=min(4, cpu/2)`).
+
+Standard build:
+
+```bash
+source /opt/ros/humble/setup.bash
+python3 src/orbslam3_ros2/scripts/build_colcon.py \
+  --ws "$COLCON_WS" \
+  --pkg orbslam3_ros2
+```
+
+Edge-device conservative build (single-worker + no testing):
+
+```bash
+source /opt/ros/humble/setup.bash
+python3 src/orbslam3_ros2/scripts/build_colcon.py \
+  --ws "$COLCON_WS" \
+  --pkg orbslam3_ros2 \
+  --ninja-conan \
+  --edge
+```
+
+`--edge` additionally enforces:
+
+- `Release` build type.
+- single-job build (`CMAKE_BUILD_PARALLEL_LEVEL=1`, `MAKEFLAGS=-j1`, `NINJAFLAGS=-j1`).
+- sequential colcon executor and `--parallel-workers 1`.
+- `BUILD_TESTING=OFF` and `-O2 -g0` compile flags.
+
+Clean workspace build artifacts first:
+
+```bash
+python3 src/orbslam3_ros2/scripts/build_colcon.py \
+  --ws "$COLCON_WS" \
+  --pkg orbslam3_ros2 \
+  --clean
+```
+
 ## Rebuild Local Conan Recipes
 
 When editing recipes under `src/orbslam3_ros2/conan/recipes/*`:
