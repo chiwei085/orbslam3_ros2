@@ -26,8 +26,8 @@ export COLCON_WS=$HOME/my_ros2_ws
 cd "$COLCON_WS"
 
 conan install src/orbslam3_ros2 \
-  -pr:h src/orbslam3_ros2/conan/profiles/myprofile \
-  -pr:b src/orbslam3_ros2/conan/profiles/myprofile \
+  -pr:h src/orbslam3_ros2/conan/profiles/linux_x86_64 \
+  -pr:b src/orbslam3_ros2/conan/profiles/linux_x86_64 \
   -of build/conan \
   -b missing
 
@@ -38,6 +38,8 @@ colcon build --packages-select orbslam3_ros2 \
     -DCMAKE_PREFIX_PATH=$PWD/build/conan \
     -DCMAKE_BUILD_TYPE=Release
 ```
+
+For arm64/aarch64 containers, use `src/orbslam3_ros2/conan/profiles/linux_armv8` for both `-pr:h` and `-pr:b`.
 
 ```bash
 source /opt/ros/humble/setup.bash
@@ -148,7 +150,7 @@ ros2 bag info "$COLCON_WS/src/orbslam3_ros2/data/tum/bags/fr1_xyz_observations"
 
 - `pose not ready within 5s`: check `manifest.json` counters and `test_summary.json`; increase `--max-frames` or playback seconds.
 - `invalid_config=true`: `play_seconds` is below `min_play_seconds_required`; rerun with longer playback.
-- `libg2o.so` not from Conan cache: inspect `ldd_orbslam3_core_node.txt` in artifact dir; rerun Conan install with `myprofile` and rebuild.
+- `libg2o.so` not from Conan cache: inspect `ldd_orbslam3_core_node.txt` in artifact dir; rerun Conan install with the matching profile (`linux_x86_64` or `linux_armv8`) and rebuild.
 
 ## Development
 

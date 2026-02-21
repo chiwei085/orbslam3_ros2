@@ -1,7 +1,3 @@
-# Deprecated compatibility profile.
-# Prefer explicit arch profiles:
-# - conan/profiles/linux_x86_64
-# - conan/profiles/linux_armv8
 [settings]
 os=Linux
 arch=x86_64

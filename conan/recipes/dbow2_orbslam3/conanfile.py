@@ -1,7 +1,7 @@
 import os
 
 from conan.tools.cmake import CMake, CMakeDeps, CMakeToolchain, cmake_layout
-from conan.tools.files import collect_libs, copy
+from conan.tools.files import collect_libs, copy, replace_in_file
 
 from conan import ConanFile
 
@@ -27,6 +27,7 @@ class DBow2Orbslam3Conan(ConanFile):
 
     def requirements(self):
         self.requires("opencv/4.8.1")
+        self.requires("boost/1.84.0")
 
     def export_sources(self):
         src = os.path.normpath(
@@ -53,6 +54,14 @@ class DBow2Orbslam3Conan(ConanFile):
     def source(self):
         src = os.path.join(self.export_sources_folder, "source")
         copy(self, "*", src=src, dst=self.source_folder)
+        replace_in_file(
+            self,
+            os.path.join(self.source_folder, "CMakeLists.txt"),
+            "target_link_libraries(DBoW2 ${OpenCV_LIBS})",
+            "find_package(Boost REQUIRED COMPONENTS serialization)\n"
+            "target_link_libraries(DBoW2 ${OpenCV_LIBS} Boost::serialization)",
+            strict=True,
+        )
 
     def build(self):
         cmake = CMake(self)
@@ -97,4 +106,5 @@ class DBow2Orbslam3Conan(ConanFile):
     def package_info(self):
         self.cpp_info.set_property("cmake_file_name", "DBoW2")
         self.cpp_info.set_property("cmake_target_name", "DBoW2::DBoW2")
+        self.cpp_info.requires = ["opencv::opencv", "boost::serialization"]
         self.cpp_info.libs = collect_libs(self)

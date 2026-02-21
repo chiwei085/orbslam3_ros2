@@ -30,8 +30,8 @@ uv tool install conan
 
 ```bash
 conan install src/orbslam3_ros2 \
-  -pr:h src/orbslam3_ros2/conan/profiles/myprofile \
-  -pr:b src/orbslam3_ros2/conan/profiles/myprofile \
+  -pr:h src/orbslam3_ros2/conan/profiles/linux_x86_64 \
+  -pr:b src/orbslam3_ros2/conan/profiles/linux_x86_64 \
   -of build/conan \
   -b missing
 
@@ -42,6 +42,8 @@ colcon build --packages-select orbslam3_ros2 \
     -DCMAKE_PREFIX_PATH=$PWD/build/conan \
     -DCMAKE_BUILD_TYPE=Release
 ```
+
+On arm64/aarch64, replace both profiles above with `src/orbslam3_ros2/conan/profiles/linux_armv8`.
 
 ## Rebuild Local Conan Recipes
 
@@ -55,7 +57,7 @@ Example (g2o recipe):
 
 ```bash
 python3 src/orbslam3_ros2/scripts/conan_rebuild.py \
-  --profile src/orbslam3_ros2/conan/profiles/myprofile \
+  --profile src/orbslam3_ros2/conan/profiles/linux_x86_64 \
   --cwd src/orbslam3_ros2 \
   --mode create \
   --recipe-dir src/orbslam3_ros2/conan/recipes/g2o_orbslam3
@@ -103,7 +105,7 @@ Gate artifacts:
 
 > [!IMPORTANT]
 > Profile drift caused unstable dependency behavior before 1.0.  
-> Fix: use only `src/orbslam3_ros2/conan/profiles/myprofile` for host+build, and keep Eigen ABI safety flags there.
+> Fix: use explicit arch profiles for host+build (`src/orbslam3_ros2/conan/profiles/linux_x86_64` or `src/orbslam3_ros2/conan/profiles/linux_armv8`) and keep Eigen ABI safety flags there.
 
 > [!INFO]
 > Symptom: gate fails with `invalid_config=true` in `manifest.json`.  
@@ -112,7 +114,7 @@ Gate artifacts:
 
 > [!INFO]
 > Symptom: runtime check reports `libg2o.so` not resolved from Conan cache.  
-> Fix: rerun `conan install` with `myprofile`, rebuild with colcon, and re-source `install/local_setup.bash`.
+> Fix: rerun `conan install` with the matching profile (`linux_x86_64` or `linux_armv8`), rebuild with colcon, and re-source `install/local_setup.bash`.
 
 > [!INFO]
 > Symptom: split launch config confusion (`rgbd.yaml` vs preset catalog).  
