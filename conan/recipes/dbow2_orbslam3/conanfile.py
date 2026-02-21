@@ -57,6 +57,20 @@ class DBow2Orbslam3Conan(ConanFile):
         replace_in_file(
             self,
             os.path.join(self.source_folder, "CMakeLists.txt"),
+            'set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS}  -Wall  -O3 -march=native ")',
+            'set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall")',
+            strict=True,
+        )
+        replace_in_file(
+            self,
+            os.path.join(self.source_folder, "CMakeLists.txt"),
+            'set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall  -O3 -march=native")',
+            'set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")',
+            strict=True,
+        )
+        replace_in_file(
+            self,
+            os.path.join(self.source_folder, "CMakeLists.txt"),
             "target_link_libraries(DBoW2 ${OpenCV_LIBS})",
             "find_package(Boost REQUIRED COMPONENTS serialization)\n"
             "target_link_libraries(DBoW2 ${OpenCV_LIBS} Boost::serialization)",
