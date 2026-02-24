@@ -23,6 +23,7 @@ def generate_launch_description():
         "depth_topic", default_value="/camera/depth_registered/image_raw"
     )
     enable_pangolin_arg = DeclareLaunchArgument("enable_pangolin", default_value="true")
+    viewer_backend_arg = DeclareLaunchArgument("viewer_backend", default_value="auto")
     use_sim_time_arg = DeclareLaunchArgument("use_sim_time", default_value="false")
 
     orb_slam3_node = Node(
@@ -44,6 +45,7 @@ def generate_launch_description():
                 "enable_pangolin": ParameterValue(
                     LaunchConfiguration("enable_pangolin"), value_type=bool
                 ),
+                "viewer_backend": LaunchConfiguration("viewer_backend"),
             }
         ],
     )
@@ -55,6 +57,7 @@ def generate_launch_description():
             rgb_topic_arg,
             depth_topic_arg,
             enable_pangolin_arg,
+            viewer_backend_arg,
             use_sim_time_arg,
             orb_slam3_node,
         ]
