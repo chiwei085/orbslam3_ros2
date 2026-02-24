@@ -1,11 +1,16 @@
 #pragma once
 
-/// @file viewer_backend_policy.hpp
-/// @brief Viewer backend selection policy for avoiding Pangolin Wayland teardown crashes.
-///
-/// This header keeps the decision logic separate from ROS node startup code so the
-/// policy can be tested without creating a ROS graph, ORB-SLAM3 system, or Pangolin
-/// window/context.
+/**
+ * @file viewer_backend_policy.hpp
+ * @brief Viewer backend selection policy for avoiding Pangolin Wayland teardown crashes
+ *
+ * This policy exists to keep backend selection logic out of ROS node startup code.
+ * It can be tested without creating a ROS graph, ORB-SLAM3 system, or Pangolin window.
+ *
+ * The policy may request a process-local environment override (`WAYLAND_DISPLAY=0`)
+ * so Pangolin does not select its Wayland backend in affected environments.
+ * The override is applied only in the current process via `setenv()`.
+ */
 
 #include <cctype>
 #include <cstdlib>
@@ -14,73 +19,62 @@
 
 namespace orbslam3_ros2::common {
 
-/// @brief Requested viewer backend mode from user-facing parameter `viewer_backend`.
+/**
+ * @brief Requested viewer backend mode from user-facing parameter `viewer_backend`
+ */
 enum class ViewerBackendMode {
-    /// Let policy detect Wayland and choose a safer runtime path.
-    Auto,
-    /// Force X11/XWayland by masking Wayland for this process.
-    X11,
-    /// Allow Wayland backend selection and accept teardown crash risk.
-    Wayland,
+    Auto,    // Detect Wayland and choose a safer path.
+    X11,     // Force X11/XWayland by masking Wayland in this process.
+    Wayland, // Allow Wayland backend selection and accept teardown risk.
 };
 
-/// @brief Snapshot of process environment variables relevant to viewer backend selection.
+/**
+ * @brief Snapshot of process environment variables used by backend policy
+ */
 struct ViewerBackendEnv {
-    /// Raw `DISPLAY` value. Empty means X11/XWayland is not available to this process.
-    std::string display;
-    /// Raw `WAYLAND_DISPLAY` value. `"0"` is treated as intentionally disabled.
-    std::string wayland_display;
-    /// Raw `XDG_SESSION_TYPE` value (e.g. `wayland`, `x11`).
-    std::string xdg_session_type;
+    std::string display;          // Raw DISPLAY value.
+    std::string wayland_display;  // Raw WAYLAND_DISPLAY value.
+    std::string xdg_session_type; // Raw XDG_SESSION_TYPE value.
 };
 
-/// @brief Result of viewer backend policy evaluation.
-///
-/// The result is split into:
-/// - normalized input (`mode`, `backend_name`)
-/// - environment probes (`has_display`, `detected_wayland`, ...)
-/// - actions (`effective_enable`, `should_set_wayland_display`)
-/// - operator-facing diagnostics (`reason`, `parse_warning`)
+/**
+ * @brief Result of backend policy evaluation
+ *
+ * The wrapper logs this result and applies any requested environment mutation
+ * before Pangolin creates a window/context.
+ */
 struct ViewerPolicyResult {
-    /// Original `enable_pangolin` request from caller.
-    bool requested_enable{false};
-    /// Effective viewer enable after policy fallback/disable rules.
-    bool effective_enable{false};
-    /// Normalized backend mode derived from user input.
-    ViewerBackendMode mode{ViewerBackendMode::Auto};
-    /// Lowercase backend string (`auto`, `x11`, `wayland`) after normalization.
-    std::string backend_name{"auto"};
-    /// `DISPLAY` is present and non-empty.
-    bool has_display{false};
-    /// `WAYLAND_DISPLAY` is present, non-empty, and not `"0"`.
-    bool wayland_display_active{false};
-    /// `XDG_SESSION_TYPE` indicates Wayland.
-    bool xdg_wayland{false};
-    /// Wayland detected by either `WAYLAND_DISPLAY` or `XDG_SESSION_TYPE`.
-    bool detected_wayland{false};
-    /// Caller should mutate process env before Pangolin init.
-    bool should_set_wayland_display{false};
-    /// Replacement value for `WAYLAND_DISPLAY` (currently `"0"`).
-    std::string wayland_display_override;
-    /// Caller should emit warning when explicit Wayland backend is requested.
-    bool warn_wayland_teardown{false};
-    /// Human-readable reason for logs / debugging.
-    std::string reason;
-    /// Warning for invalid backend string that was normalized to `auto`.
-    std::string parse_warning;
+    bool requested_enable{false};           // Original enable_pangolin input.
+    bool effective_enable{false};           // Effective viewer enable after policy.
+    ViewerBackendMode mode{ViewerBackendMode::Auto}; // Normalized backend mode.
+    std::string backend_name{"auto"};       // Canonical backend string.
+    bool has_display{false};                // DISPLAY is present and non-empty.
+    bool wayland_display_active{false};     // WAYLAND_DISPLAY is active and not "0".
+    bool xdg_wayland{false};                // XDG_SESSION_TYPE indicates wayland.
+    bool detected_wayland{false};           // Any Wayland hint is present.
+    bool should_set_wayland_display{false}; // Caller should mutate WAYLAND_DISPLAY.
+    std::string wayland_display_override;   // Value to write into WAYLAND_DISPLAY.
+    bool warn_wayland_teardown{false};      // Caller should warn about teardown risk.
+    std::string reason;                     // Human-readable policy decision.
+    std::string parse_warning;              // Warning for invalid backend input.
 };
 
-/// @brief Read one environment variable as a string.
-/// @param name Environment variable name to query.
-/// @return Current value, or empty string if the variable is unset.
+/**
+ * @brief Read one environment variable as a string
+ * @param name Environment variable name to query
+ * @return Current value, or empty string if the variable is unset
+ */
 inline auto get_env_string(const char* name) -> std::string {
     const char* value = std::getenv(name);
     return value ? std::string(value) : std::string{};
 }
 
-/// @brief Capture viewer-related environment variables from the current process.
-/// @return Snapshot of `DISPLAY`, `WAYLAND_DISPLAY`, and `XDG_SESSION_TYPE`.
-/// @note This is side-effect free and is intended to feed `evaluate_viewer_backend_policy()`.
+/**
+ * @brief Capture viewer-related environment variables from the current process
+ * @return Snapshot of `DISPLAY`, `WAYLAND_DISPLAY`, and `XDG_SESSION_TYPE`
+ * @note This function is side-effect free. It exists so tests can bypass process
+ *       environment reads and pass a synthetic `ViewerBackendEnv`.
+ */
 inline auto get_viewer_backend_env_from_process() -> ViewerBackendEnv {
     return {
         get_env_string("DISPLAY"),
@@ -89,10 +83,13 @@ inline auto get_viewer_backend_env_from_process() -> ViewerBackendEnv {
     };
 }
 
-/// @brief ASCII lowercase helper used for tolerant parameter parsing.
-/// @param value Input string.
-/// @return Lowercased copy using ASCII rules.
-/// @note Policy parameters are ASCII tokens (`auto|x11|wayland`).
+/**
+ * @brief ASCII lowercase helper for tolerant backend string parsing
+ * @param value Input string
+ * @return Lowercased copy using ASCII rules
+ * @note Policy tokens are ASCII (`auto|x11|wayland`). Locale-dependent behavior
+ *       is not needed here.
+ */
 inline auto to_lower_ascii(std::string value) -> std::string {
     // Keep parsing locale-independent. Parameter values are ASCII tokens.
     for (char& c : value) {
@@ -101,10 +98,13 @@ inline auto to_lower_ascii(std::string value) -> std::string {
     return value;
 }
 
-/// @brief Parse user-facing backend string into normalized mode + canonical name.
-/// @param value Raw parameter value from caller.
-/// @return Pair of parsed mode and canonical lowercase backend string.
-/// @note Invalid values intentionally fall back to `auto`; caller reports warning text.
+/**
+ * @brief Parse user backend string into normalized mode and canonical name
+ * @param value Raw parameter value from caller
+ * @return Pair of parsed mode and canonical lowercase backend string
+ * @note Invalid values intentionally fall back to `auto`. The caller can emit a
+ *       warning based on `ViewerPolicyResult::parse_warning`.
+ */
 inline auto parse_viewer_backend_mode(const std::string& value)
     -> std::pair<ViewerBackendMode, std::string> {
     auto normalized = to_lower_ascii(value);
@@ -117,54 +117,56 @@ inline auto parse_viewer_backend_mode(const std::string& value)
     return {ViewerBackendMode::Auto, normalized == "auto" ? normalized : "auto"};
 }
 
-/// @brief Compute viewer backend policy from caller intent and environment snapshot.
-/// @param enable_pangolin Requested viewer enable flag from wrapper parameter.
-/// @param viewer_backend Raw backend selector string (`auto|x11|wayland`, case-insensitive).
-/// @param env Environment snapshot used for backend selection and fallback decisions.
-/// @return A policy result describing effective viewer enable, diagnostics, and any
-///         process-local env mutation the caller should apply before Pangolin init.
-/// @note This function does not mutate process environment. The wrapper applies the
-///       requested env change after logging and error handling.
-/// @warning `viewer_backend=wayland` keeps Wayland backend selection enabled. In some
-///          Wayland/WSLg environments, Pangolin teardown may crash on shutdown.
-/// @details
-/// Policy summary (effective backend is encoded by `effective_enable` +
-/// `should_set_wayland_display`/`wayland_display_override`):
-///
-/// | `enable_pangolin` | `viewer_backend` | Environment signal | Output (`effective_enable`, env mutation) |
-/// | --- | --- | --- | --- |
-/// | `false` | any | any | disabled, no env mutation |
-/// | `true` | `auto` | no Wayland detected | enabled, no env mutation (keep default backend selection) |
-/// | `true` | `auto` | Wayland detected + `DISPLAY` present | enabled, set `WAYLAND_DISPLAY=0` (force X11/XWayland) |
-/// | `true` | `auto` | Wayland detected + no `DISPLAY` | disabled, no env mutation |
-/// | `true` | `x11` | `DISPLAY` present | enabled, set `WAYLAND_DISPLAY=0` (force X11/XWayland) |
-/// | `true` | `x11` | no `DISPLAY` | disabled, no env mutation |
-/// | `true` | `wayland` | any | enabled, no env mutation (caller warns) |
-///
-/// Design choices:
-/// - `WAYLAND_DISPLAY=0` is used instead of unsetting it because this is the path
-///   observed to reliably avoid Pangolin's Wayland backend in affected environments.
-///   The mutation is process-local only (`setenv()` in this process).
-/// - `auto` disables viewer when Wayland is detected but `DISPLAY` is missing to
-///   avoid a hard-fail trying to force X11 on systems without XWayland export.
-///
-/// @code
-/// using orbslam3_ros2::common::ViewerBackendEnv;
-/// using orbslam3_ros2::common::evaluate_viewer_backend_policy;
-///
-/// // Wayland session with XWayland available -> force X11 by masking Wayland.
-/// auto a = evaluate_viewer_backend_policy(
-///     true, "auto", ViewerBackendEnv{":0", "wayland-0", "wayland"});
-/// // a.effective_enable == true
-/// // a.should_set_wayland_display == true
-/// // a.wayland_display_override == "0"   // caller applies setenv("WAYLAND_DISPLAY","0",1)
-///
-/// // Wayland session without DISPLAY -> disable viewer in auto mode.
-/// auto b = evaluate_viewer_backend_policy(
-///     true, "auto", ViewerBackendEnv{"", "wayland-0", "wayland"});
-/// // b.effective_enable == false
-/// // b.should_set_wayland_display == false
-/// @endcode
+/**
+ * @brief Compute viewer backend policy from caller intent and environment snapshot
+ * @param enable_pangolin Requested viewer enable flag from wrapper parameter
+ * @param viewer_backend Raw backend selector string (`auto|x11|wayland`, case-insensitive)
+ * @param env Environment snapshot used for backend selection and fallback decisions
+ * @return Policy result with effective viewer enable, normalized backend, warning flags,
+ *         and any process-local env mutation to apply before Pangolin initialization
+ * @note This function does not mutate the process environment. The wrapper applies
+ *       the requested env change after logging and error handling.
+ * @note `WAYLAND_DISPLAY=0` is used instead of unsetting `WAYLAND_DISPLAY` because
+ *       it was observed to be the more reliable way to block Pangolin Wayland backend
+ *       selection in affected environments. The mutation remains process-local.
+ * @warning `viewer_backend=wayland` allows Wayland backend selection. In some
+ *          Wayland/WSLg environments, Pangolin teardown may crash on shutdown.
+ * @details
+ * Rules (effective backend is encoded by `effective_enable` plus env mutation):
+ *
+ * | `enable_pangolin` | `viewer_backend` | Env signal | `effective_enable` | Env mutation |
+ * | --- | --- | --- | --- | --- |
+ * | `false` | any | any | `false` | none |
+ * | `true` | `auto` | no Wayland detected | `true` | none |
+ * | `true` | `auto` | Wayland detected + `DISPLAY` present | `true` | `WAYLAND_DISPLAY=0` |
+ * | `true` | `auto` | Wayland detected + no `DISPLAY` | `false` | none |
+ * | `true` | `x11` | `DISPLAY` present | `true` | `WAYLAND_DISPLAY=0` |
+ * | `true` | `x11` | no `DISPLAY` | `false` | none |
+ * | `true` | `wayland` | any | `true` | none |
+ *
+ * `auto` disables the viewer when Wayland is detected and `DISPLAY` is missing.
+ * This avoids a hard-fail path when X11/XWayland is not exported to the process.
+ *
+ * @code
+ * using orbslam3_ros2::common::ViewerBackendEnv;
+ * using orbslam3_ros2::common::evaluate_viewer_backend_policy;
+ *
+ * // Wayland session with DISPLAY available -> keep viewer enabled and force X11.
+ * auto a = evaluate_viewer_backend_policy(
+ *     true, "auto", ViewerBackendEnv{":0", "wayland-0", "wayland"});
+ * // a.effective_enable == true
+ * // a.should_set_wayland_display == true
+ * // a.wayland_display_override == "0"
+ * @endcode
+ *
+ * @code
+ * // Wayland session without DISPLAY -> disable viewer in auto mode.
+ * auto b = evaluate_viewer_backend_policy(
+ *     true, "auto", ViewerBackendEnv{"", "wayland-0", "wayland"});
+ * // b.effective_enable == false
+ * // b.should_set_wayland_display == false
+ * @endcode
+ */
 inline auto evaluate_viewer_backend_policy(
     bool enable_pangolin, const std::string& viewer_backend,
     const ViewerBackendEnv& env) -> ViewerPolicyResult {
@@ -172,10 +174,10 @@ inline auto evaluate_viewer_backend_policy(
     result.requested_enable = enable_pangolin;
     result.effective_enable = enable_pangolin;
     result.has_display = !env.display.empty();
-    // "0" means caller already masked Wayland. Do not treat it as active Wayland.
+    // "0" means Wayland was already masked. Treat it as inactive.
     result.wayland_display_active =
         !env.wayland_display.empty() && env.wayland_display != "0";
-    // XDG_SESSION_TYPE is only a hint. WAYLAND_DISPLAY remains the stronger signal.
+    // XDG_SESSION_TYPE is a hint. WAYLAND_DISPLAY remains the stronger signal.
     result.xdg_wayland = to_lower_ascii(env.xdg_session_type) == "wayland";
     result.detected_wayland = result.wayland_display_active || result.xdg_wayland;
 
@@ -184,14 +186,14 @@ inline auto evaluate_viewer_backend_policy(
     result.backend_name = std::move(backend_name);
 
     if (to_lower_ascii(viewer_backend) != result.backend_name) {
-        // Keep parser permissive. Wrapper can warn without changing control flow.
+        // Keep parsing permissive. Wrapper can warn without changing control flow.
         result.parse_warning =
             "Unknown viewer_backend='" + viewer_backend +
             "', falling back to 'auto' (expected auto|x11|wayland)";
     }
 
     if (!enable_pangolin) {
-        // Preserve explicit user disable. Policy never re-enables the viewer.
+        // Preserve explicit disable. Policy never re-enables the viewer.
         result.reason = "viewer disabled (enable_pangolin=false)";
         return result;
     }
@@ -201,11 +203,11 @@ inline auto evaluate_viewer_backend_policy(
         if (!result.detected_wayland) {
             result.reason = "keeping default backend";
         } else if (!result.has_display) {
-            // Avoid forcing X11 when no X11/XWayland endpoint is exposed.
+            // No X11 endpoint is available. Disable instead of forcing a failing path.
             result.effective_enable = false;
             result.reason = "Wayland detected but DISPLAY is empty -> disabling viewer";
         } else {
-            // Process-local mask. Pangolin backend selection happens later in wrapper.
+            // Pangolin backend selection happens later in wrapper startup.
             result.should_set_wayland_display = true;
             result.wayland_display_override = "0";
             result.reason = "forcing X11 (WAYLAND_DISPLAY=0)";
@@ -213,7 +215,7 @@ inline auto evaluate_viewer_backend_policy(
         break;
     case ViewerBackendMode::X11:
         if (!result.has_display) {
-            // Explicit x11 request but no X display. Disable instead of hard-failing later.
+            // Explicit x11 request with no DISPLAY. Disable instead of hard-failing later.
             result.effective_enable = false;
             result.reason = "viewer_backend=x11 but DISPLAY is empty -> disabling viewer";
         } else {
@@ -231,22 +233,28 @@ inline auto evaluate_viewer_backend_policy(
     return result;
 }
 
-/// @brief Apply the environment mutation requested by a previously computed policy.
-/// @param result Policy result from `evaluate_viewer_backend_policy()`.
-/// @return `true` on success, or `false` if `setenv()` failed.
-/// @note This only mutates the current process environment and must run before
-///       Pangolin creates any window/context.
-/// @warning Calling this after Pangolin initialization is too late to affect backend
-///          selection and will not prevent Wayland teardown issues.
+/**
+ * @brief Apply environment mutation requested by a previously computed policy
+ * @param result Policy result from `evaluate_viewer_backend_policy()`
+ * @return `true` on success, or `false` if `setenv()` failed
+ * @note This mutates only the current process environment. It must run before
+ *       Pangolin creates any window or EGL context to affect backend selection.
+ * @warning Calling this after Pangolin initialization is too late and will not
+ *          prevent Wayland teardown crashes.
+ * @details
+ * The only mutation currently supported is `WAYLAND_DISPLAY=<override>`, where the
+ * override is usually `"0"` to prevent Wayland backend selection.
+ */
 inline auto apply_viewer_backend_env_policy(const ViewerPolicyResult& result)
     -> bool {
     if (!result.should_set_wayland_display) {
         // No mutation requested. Keep caller path simple.
         return true;
     }
-    // Override only in this process. Parent shell and system session are unchanged.
+    // Override only in this process. Parent shell and system session stay unchanged.
     return ::setenv("WAYLAND_DISPLAY", result.wayland_display_override.c_str(), 1) ==
            0;
 }
 
 }  // namespace orbslam3_ros2::common
+
