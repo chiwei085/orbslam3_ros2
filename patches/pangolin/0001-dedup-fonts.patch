@@ -1,0 +1,31 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Codex <codex@example.invalid>
+Date: Tue, 24 Feb 2026 00:00:00 +0000
+Subject: [PATCH] pango_display: do not compile embedded fonts twice
+
+`pango_opengl` already generates and owns `fonts.cpp` (AnonymousPro_ttf*).
+`pango_display` links against `pango_opengl`, so compiling `fonts.cpp` again in
+`pango_display` duplicates the same global font blob symbols across DSOs and
+triggers ASAN ODR violations.
+
+Keep the embedded fonts in `pango_opengl` only and let `pango_display`
+reference the symbols through that dependency.
+---
+ components/pango_display/CMakeLists.txt | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/components/pango_display/CMakeLists.txt b/components/pango_display/CMakeLists.txt
+index 79e40b1..d411144 100644
+--- a/components/pango_display/CMakeLists.txt
++++ b/components/pango_display/CMakeLists.txt
+@@ -13,7 +13,6 @@ PRIVATE
+     ${CMAKE_CURRENT_LIST_DIR}/src/image_view.cpp
+     ${CMAKE_CURRENT_LIST_DIR}/src/ConsoleView.cpp
+     ${CMAKE_CURRENT_LIST_DIR}/src/default_font.cpp
+-    ${CMAKE_CURRENT_BINARY_DIR}/fonts.cpp
+ )
+ 
+ set_target_properties(
+-- 
+2.34.1
+

@@ -109,7 +109,7 @@ def _stage_install(prefix: pathlib.Path) -> None:
 
 
 def main() -> int:
-    DEFAULT_JOBS = 8
+    DEFAULT_JOBS = 4
 
     ap = argparse.ArgumentParser()
     ap.add_argument(
@@ -140,11 +140,29 @@ def main() -> int:
     prefix = pathlib.Path(args.prefix).resolve() if args.prefix else None
     generator: str = args.generator
     build_type: str = args.build_type
+    extra_c_flags = os.environ.get("ORB_EXTRA_CMAKE_C_FLAGS", "").strip()
+    extra_cxx_flags = os.environ.get("ORB_EXTRA_CMAKE_CXX_FLAGS", "").strip()
+    extra_exe_linker_flags = os.environ.get("ORB_EXTRA_CMAKE_EXE_LINKER_FLAGS", "").strip()
+    extra_shared_linker_flags = os.environ.get("ORB_EXTRA_CMAKE_SHARED_LINKER_FLAGS", "").strip()
+    enable_shutdown_trace = os.environ.get("ORB_ENABLE_SHUTDOWN_TRACE", "0").strip() == "1"
     std_args = [
         "-DCMAKE_CXX_STANDARD=17",
         "-DCMAKE_CXX_STANDARD_REQUIRED=ON",
         "-DCMAKE_CXX_EXTENSIONS=OFF",
     ]
+    common_flag_args: list[str] = []
+    if extra_c_flags:
+        common_flag_args.append(f"-DCMAKE_C_FLAGS={extra_c_flags}")
+    if extra_cxx_flags:
+        if enable_shutdown_trace:
+            extra_cxx_flags = f"{extra_cxx_flags} -DORBROS_SHUTDOWN_TRACE=1"
+        common_flag_args.append(f"-DCMAKE_CXX_FLAGS={extra_cxx_flags}")
+    elif enable_shutdown_trace:
+        common_flag_args.append("-DCMAKE_CXX_FLAGS=-DORBROS_SHUTDOWN_TRACE=1")
+    if extra_exe_linker_flags:
+        common_flag_args.append(f"-DCMAKE_EXE_LINKER_FLAGS={extra_exe_linker_flags}")
+    if extra_shared_linker_flags:
+        common_flag_args.append(f"-DCMAKE_SHARED_LINKER_FLAGS={extra_shared_linker_flags}")
 
     if args.clean:
         for d in [
@@ -163,9 +181,18 @@ def main() -> int:
             f"-DCMAKE_PREFIX_PATH={prefix}",
             f"-DPangolin_DIR={prefix}/lib/cmake/Pangolin",
         ]
-    extra_orb += [
-        "-DCMAKE_CXX_FLAGS=-std=c++17",
-    ]
+    if extra_cxx_flags:
+        extra_orb += [f"-DCMAKE_CXX_FLAGS=-std=c++17 {extra_cxx_flags}"]
+    elif enable_shutdown_trace:
+        extra_orb += ["-DCMAKE_CXX_FLAGS=-std=c++17 -DORBROS_SHUTDOWN_TRACE=1"]
+    else:
+        extra_orb += ["-DCMAKE_CXX_FLAGS=-std=c++17"]
+    if extra_c_flags:
+        extra_orb += [f"-DCMAKE_C_FLAGS={extra_c_flags}"]
+    if extra_exe_linker_flags:
+        extra_orb += [f"-DCMAKE_EXE_LINKER_FLAGS={extra_exe_linker_flags}"]
+    if extra_shared_linker_flags:
+        extra_orb += [f"-DCMAKE_SHARED_LINKER_FLAGS={extra_shared_linker_flags}"]
 
     thirdparty = [
         ("DBoW2", ORB / "Thirdparty" / "DBoW2"),
@@ -175,7 +202,10 @@ def main() -> int:
     for name, src in thirdparty:
         b = src / "build"
         print(f"== Build Thirdparty/{name} ==", flush=True)
-        _cmake_configure(src, b, generator, build_type, extra_cmake_args=std_args)
+        extra_args = list(std_args + common_flag_args)
+        if name == "Sophus":
+            extra_args += ["-DBUILD_TESTS=OFF", "-DBUILD_EXAMPLES=OFF"]
+        _cmake_configure(src, b, generator, build_type, extra_cmake_args=extra_args)
         _cmake_build(b, jobs)
 
     if not args.skip_vocab:
