@@ -125,7 +125,13 @@ Common launch arguments:
 - `rgb_topic` (default `/camera/rgb/image_raw`).
 - `depth_topic` (default `/camera/depth_registered/image_raw`).
 - `enable_pangolin`.
+- `viewer_backend` (`auto|x11|wayland`, default `auto`).
 - `use_sim_time`.
+
+Viewer backend note:
+
+- In Wayland sessions, `viewer_backend:=auto` forces Pangolin to use X11/XWayland (`WAYLAND_DISPLAY=0`) to avoid a known Wayland teardown crash.
+- You can force Wayland with `viewer_backend:=wayland` (not recommended; may crash on shutdown in some environments).
 
 Atlas save/load:
 
@@ -157,25 +163,78 @@ Read the WSL setup guide first:
 
 That guide covers Windows `usbipd`, custom `librealsense`, `realsense-ros` source build, and the WSL-specific ROS 2 runtime workarounds.
 
-Then use the one-command launch (RealSense node + ORB-SLAM3 + Pangolin + save-ready config):
+This launch is intended for WSL RealSense setups and uses `config/RGB-D/RealSense_D435i_save.yaml` (atlas save/load ready).
 
-```bash
-source /opt/ros/humble/setup.bash
-source install/setup.bash
-ros2 launch orbslam3_ros2 realsense_d435i_rgbd_wsl_save.launch.py
-```
-
-Notes:
-
-- This launch is intended for WSL RealSense setups only.
-- It uses `config/RGB-D/RealSense_D435i_save.yaml` (atlas save/load ready).
-- It will prompt for `sudo` because the RealSense node is launched as root in the WSL workaround flow.
-- To run the same WSL workflow **without atlas save**, override the settings file:
+To run the same WSL workflow without atlas save, override the settings file:
 
 ```bash
 ros2 launch orbslam3_ros2 realsense_d435i_rgbd_wsl_save.launch.py \
   settings_file:=<path-to>/config/RGB-D/RealSense_D435i.yaml
 ```
+
+#### Quickstart (default)
+
+Terminal A (start the camera yourself):
+
+```bash
+source /opt/ros/humble/setup.bash
+source install/setup.bash
+ros2 launch realsense2_camera rs_launch.py \
+  camera_namespace:=camera camera_name:=camera \
+  enable_sync:=true align_depth.enable:=true
+```
+
+Terminal B (start ORB wrapper only):
+
+```bash
+source /opt/ros/humble/setup.bash
+source install/setup.bash
+ros2 launch orbslam3_ros2 realsense_d435i_rgbd_wsl_save.launch.py \
+  start_realsense:=false viewer_backend:=auto
+```
+
+Notes:
+
+- `start_realsense:=false` avoids interfering with a camera process you already launched.
+- On WSL/Wayland, keep `viewer_backend:=auto` (it auto-forces X11/XWayland for Pangolin).
+
+#### Optional: quick output-save verification (one-shot)
+
+Use this when you want a short run that auto-shuts down and validates save outputs (`mtime` + non-empty file checks):
+
+```bash
+ros2 launch orbslam3_ros2 realsense_d435i_rgbd_wsl_save.launch.py \
+  start_realsense:=false viewer_backend:=auto \
+  check_outputs:=true orb_shutdown_after_sec:=30.0
+```
+
+#### Debug (opt-in)
+
+ASAN is for memory-bug triage. Keep it out of the default quickstart.
+
+```bash
+ros2 launch orbslam3_ros2 realsense_d435i_rgbd_wsl_save.launch.py \
+  start_realsense:=false viewer_backend:=auto \
+  check_outputs:=true orb_shutdown_after_sec:=30.0 \
+  asan_options:="detect_odr_violation=1:new_delete_type_mismatch=0:abort_on_error=1:halt_on_error=1" \
+  debug_mode:=true
+```
+
+Notes:
+
+- `new_delete_type_mismatch=0` is disabled because it is known ROS 2 + ASAN noise (`rcutils` / `rclcpp`), not a workflow-specific signal.
+- `debug_mode:=true` defaults `LSAN_OPTIONS=detect_leaks=0` if `lsan_options` is not explicitly set.
+- Logs: `orb.log` -> `/tmp/orbslam3_orb.log`, `realsense.log` -> `/tmp/orbslam3_realsense.log`, first ASAN extract -> `/tmp/orbslam3_first_asan.txt`.
+
+#### Troubleshooting (topics)
+
+```bash
+ros2 topic list | grep /camera
+ros2 topic hz /camera/camera/color/image_raw
+ros2 topic hz /camera/camera/aligned_depth_to_color/image_raw
+```
+
+If topics are delayed, the launch gate waits for them before starting ORB-SLAM3.
 
 ## Third-party sources
 
