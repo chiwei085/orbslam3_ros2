@@ -1,3 +1,6 @@
 [submodule "third_party/Pangolin"]
 	path = third_party/Pangolin
 	url = git@github.com:stevenlovegrove/Pangolin.git
+[submodule "third_party/ORB_SLAM3"]
+	path = third_party/ORB_SLAM3
+	url = git@github.com:chiwei085/ORB_SLAM3.git
