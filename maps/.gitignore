@@ -1,0 +1,3 @@
+# Keep this directory for local ORB-SLAM3 atlas files.
+*
+!.gitignore
