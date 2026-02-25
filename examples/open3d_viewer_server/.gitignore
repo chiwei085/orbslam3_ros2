@@ -1,0 +1,6 @@
+/out/
+!/out/.gitkeep
+
+/open3d_viewer_server.egg-info/
+/.venv/
+**/__pycache__/
