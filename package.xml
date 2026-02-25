@@ -2,12 +2,14 @@
 <package format="3">
   <name>orbslam3_ros2</name>
   <version>0.0.0</version>
-  <description>WIP ROS2 package skeleton for ORB-SLAM3 integration.</description>
+  <description>ROS 2 wrapper for ORB-SLAM3 with runtime nodes and offline atlas export tooling.</description>
 
   <maintainer email="todo@example.com">TODO Maintainer</maintainer>
   <license>TODO</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <build_depend>orbslam3_ros2_vendor</build_depend>
 
   <depend>rclcpp</depend>
   <depend>rclpy</depend>
@@ -21,6 +23,7 @@
   <depend>image_transport</depend>
   <depend>message_filters</depend>
   <depend>std_srvs</depend>
+  <exec_depend>orbslam3_ros2_vendor</exec_depend>
 
   <test_depend>ament_cmake_gtest</test_depend>
 
