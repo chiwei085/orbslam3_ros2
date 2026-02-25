@@ -18,8 +18,7 @@ from launch.actions import (
 from launch.conditions import IfCondition, UnlessCondition
 from launch.event_handlers import OnProcessExit
 from launch.events import Shutdown
-from launch.substitutions import LaunchConfiguration
-
+from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch import LaunchDescription
 
 # Example runs (viewer/save validation flow):
@@ -185,9 +184,9 @@ def _make_orb_bundle_actions(
         "-p",
         "depth_topic:=/camera/camera/aligned_depth_to_color/image_raw",
         "-p",
-        "world_frame_id:=world",
+        f"map_frame_id:={_lc_str(context, 'map_frame_id')}",
         "-p",
-        "cam_frame_id:=camera",
+        f"cam_frame_id:={_lc_str(context, 'cam_frame_id')}",
         "-p",
         f"enable_pangolin:={enable_pangolin}",
         "-p",
@@ -316,6 +315,8 @@ def generate_launch_description():
 
     voc_file_arg = DeclareLaunchArgument("voc_file", default_value=default_voc)
     settings_file_arg = DeclareLaunchArgument("settings_file", default_value=default_settings)
+    map_frame_id_arg = DeclareLaunchArgument("map_frame_id", default_value="map")
+    cam_frame_id_arg = DeclareLaunchArgument("cam_frame_id", default_value="camera_link")
     enable_pangolin_arg = DeclareLaunchArgument("enable_pangolin", default_value="true")
     viewer_backend_arg = DeclareLaunchArgument("viewer_backend", default_value="auto")
     realsense_with_sudo_arg = DeclareLaunchArgument("realsense_with_sudo", default_value="true")
@@ -396,6 +397,8 @@ def generate_launch_description():
         [
             voc_file_arg,
             settings_file_arg,
+            map_frame_id_arg,
+            cam_frame_id_arg,
             enable_pangolin_arg,
             viewer_backend_arg,
             realsense_with_sudo_arg,

@@ -6,6 +6,11 @@
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/image_encodings.hpp>
 #include <sensor_msgs/msg/image.hpp>
+#include <tf2/LinearMath/Quaternion.h>
+#include <tf2/LinearMath/Transform.h>
+#include <tf2/LinearMath/Vector3.h>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
+#include <tf2_ros/transform_broadcaster.h>
 
 #include <atomic>
 #include <cctype>
@@ -21,7 +26,6 @@
 
 #include "orbslam3_ros2/common/pose_path_publisher.hpp"
 #include "orbslam3_ros2/common/reset_service.hpp"
-#include "orbslam3_ros2/common/tf_publisher.hpp"
 #include "orbslam3_ros2/common/viewer_backend_policy.hpp"
 
 #include "ShutdownTrace.h"
@@ -62,6 +66,13 @@ bool is_supported_depth_encoding(const std::string& encoding) {
     return encoding == TYPE_16UC1 || encoding == TYPE_32FC1;
 }
 
+tf2::Transform tf2_from_sophus(const Sophus::SE3f& pose) {
+    const auto t = pose.translation();
+    const auto q = pose.unit_quaternion();
+    return tf2::Transform(tf2::Quaternion(q.x(), q.y(), q.z(), q.w()),
+                          tf2::Vector3(t.x(), t.y(), t.z()));
+}
+
 void trace_shutdown(const char* tag, const std::string& msg) {
 #ifdef ORBROS_SHUTDOWN_TRACE
     ORB_SLAM3::shutdown_trace::log(tag, msg);
@@ -78,14 +89,14 @@ public:
     RgbdNode()
         : rclcpp::Node("orb_slam3"),
           topic_prefix_("/" + std::string(get_name())),
-          tf_publisher_(*this),
+          tf_broadcaster_(*this),
           rgb_sub_(),
           depth_sub_(),
           sync_(ApproximateSyncPolicy(10), rgb_sub_, depth_sub_) {
         declare_parameter("voc_file", "file_not_set");
         declare_parameter("settings_file", "file_not_set");
-        declare_parameter("world_frame_id", "map");
-        declare_parameter("cam_frame_id", "camera");
+        declare_parameter("map_frame_id", "map");
+        declare_parameter("cam_frame_id", "camera_link");
         declare_parameter("rgb_topic", "/camera/rgb/image_raw");
         declare_parameter("depth_topic", "/camera/depth_registered/image_raw");
         declare_parameter("enable_pangolin", true);
@@ -94,7 +105,7 @@ public:
 
         auto voc_file = get_parameter("voc_file").as_string();
         auto settings_file = get_parameter("settings_file").as_string();
-        world_frame_id_ = get_parameter("world_frame_id").as_string();
+        map_frame_id_ = get_parameter("map_frame_id").as_string();
         cam_frame_id_ = get_parameter("cam_frame_id").as_string();
         auto rgb_topic = get_parameter("rgb_topic").as_string();
         auto depth_topic = get_parameter("depth_topic").as_string();
@@ -102,6 +113,10 @@ public:
         auto viewer_backend = get_parameter("viewer_backend").as_string();
         auto shutdown_after_sec =
             get_parameter("shutdown_after_sec").as_double();
+
+        RCLCPP_INFO(get_logger(),
+                    "[tf] standalone publishing dynamic TF only: %s->%s",
+                    map_frame_id_.c_str(), cam_frame_id_.c_str());
 
         if (voc_file == "file_not_set" || settings_file == "file_not_set") {
             RCLCPP_FATAL(
@@ -167,7 +182,7 @@ public:
 
         pose_path_publisher_ =
             std::make_unique<orbslam3_ros2::common::PosePathPublisher>(
-                *this, topic_prefix_, world_frame_id_);
+                *this, topic_prefix_, map_frame_id_);
 
         reset_service_ = std::make_unique<orbslam3_ros2::common::ResetService>(
             *this, topic_prefix_, slam_mutex_,
@@ -301,7 +316,18 @@ private:
         if (!pose_path_publisher_->publish(twc, stamp)) {
             return;
         }
-        tf_publisher_.publish(twc, world_frame_id_, cam_frame_id_, stamp);
+
+        publish_camera_tf(twc, stamp);
+    }
+
+    void publish_camera_tf(const Sophus::SE3f& twc,
+                           const builtin_interfaces::msg::Time& stamp) {
+        geometry_msgs::msg::TransformStamped tf_msg;
+        tf_msg.header.stamp = stamp;
+        tf_msg.header.frame_id = map_frame_id_;
+        tf_msg.child_frame_id = cam_frame_id_;
+        tf_msg.transform = tf2::toMsg(tf2_from_sophus(twc));
+        tf_broadcaster_.sendTransform(tf_msg);
     }
 
     struct CallbackGuard
@@ -331,7 +357,7 @@ private:
 
 private:
     std::string topic_prefix_;
-    std::string world_frame_id_;
+    std::string map_frame_id_;
     std::string cam_frame_id_;
     std::string rgb_encoding_;
 
@@ -344,7 +370,7 @@ private:
 
     std::unique_ptr<orbslam3_ros2::common::PosePathPublisher>
         pose_path_publisher_;
-    orbslam3_ros2::common::TfPublisher tf_publisher_;
+    tf2_ros::TransformBroadcaster tf_broadcaster_;
     std::unique_ptr<orbslam3_ros2::common::ResetService> reset_service_;
 
     message_filters::Subscriber<Image> rgb_sub_;

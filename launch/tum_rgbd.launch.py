@@ -1,5 +1,3 @@
-from pathlib import Path
-
 from ament_index_python.packages import get_package_share_directory
 from launch.actions import DeclareLaunchArgument
 from launch.substitutions import LaunchConfiguration
@@ -25,6 +23,8 @@ def generate_launch_description():
     enable_pangolin_arg = DeclareLaunchArgument("enable_pangolin", default_value="true")
     viewer_backend_arg = DeclareLaunchArgument("viewer_backend", default_value="auto")
     use_sim_time_arg = DeclareLaunchArgument("use_sim_time", default_value="false")
+    map_frame_id_arg = DeclareLaunchArgument("map_frame_id", default_value="map")
+    cam_frame_id_arg = DeclareLaunchArgument("cam_frame_id", default_value="camera_link")
 
     orb_slam3_node = Node(
         package="orbslam3_ros2",
@@ -40,8 +40,8 @@ def generate_launch_description():
                 "settings_file": LaunchConfiguration("settings_file"),
                 "rgb_topic": LaunchConfiguration("rgb_topic"),
                 "depth_topic": LaunchConfiguration("depth_topic"),
-                "world_frame_id": "world",
-                "cam_frame_id": "camera",
+                "map_frame_id": LaunchConfiguration("map_frame_id"),
+                "cam_frame_id": LaunchConfiguration("cam_frame_id"),
                 "enable_pangolin": ParameterValue(
                     LaunchConfiguration("enable_pangolin"), value_type=bool
                 ),
@@ -59,6 +59,8 @@ def generate_launch_description():
             enable_pangolin_arg,
             viewer_backend_arg,
             use_sim_time_arg,
+            map_frame_id_arg,
+            cam_frame_id_arg,
             orb_slam3_node,
         ]
     )
