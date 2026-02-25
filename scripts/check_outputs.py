@@ -103,14 +103,19 @@ def main() -> int:
         print("[check_outputs] require_nonempty=1", file=sys.stderr, flush=True)
 
     while time.monotonic() < deadline:
-        statuses = {path: _path_ready(path, args.min_mtime, args.require_nonempty) for path in expected_paths}
+        statuses = {
+            path: _path_ready(path, args.min_mtime, args.require_nonempty)
+            for path in expected_paths
+        }
         not_ready = [path for path, (ok, _reason) in statuses.items() if not ok]
         if not not_ready:
             print("[check_outputs] all expected outputs found", file=sys.stderr, flush=True)
             return 0
         time.sleep(0.5)
 
-    statuses = {path: _path_ready(path, args.min_mtime, args.require_nonempty) for path in expected_paths}
+    statuses = {
+        path: _path_ready(path, args.min_mtime, args.require_nonempty) for path in expected_paths
+    }
     print("[check_outputs] outputs not ready after timeout:", file=sys.stderr, flush=True)
     for path, (ok, reason) in statuses.items():
         if ok:

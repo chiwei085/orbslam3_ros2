@@ -13,7 +13,9 @@ ASAN_ABORT_RE = re.compile(r"ABORTING")
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Extract the first ASAN error block from a log file.")
+    parser = argparse.ArgumentParser(
+        description="Extract the first ASAN error block from a log file."
+    )
     parser.add_argument("--input-log", required=True)
     parser.add_argument("--output-file", default="/tmp/orbslam3_first_asan.txt")
     return parser.parse_args()
@@ -63,11 +65,7 @@ def main() -> int:
     lines = input_log.read_text(encoding="utf-8", errors="replace").splitlines(keepends=True)
     block = extract_first_sanitizer_block(lines)
     if not block:
-        msg = (
-            "no sanitizer error found\n"
-            f"timestamp={time.time():.6f}\n"
-            f"log={input_log}\n"
-        )
+        msg = f"no sanitizer error found\ntimestamp={time.time():.6f}\nlog={input_log}\n"
         output_file.write_text(msg, encoding="utf-8")
         print(msg.strip(), flush=True)
         return 0
